@@ -48,14 +48,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/emsdk/upstream/emscripten/cache
-          key: emscripten-sdl2-cache-${{ hashFiles('.github/workflows/wasm.yml') }}
+          key: emscripten-cache-${{ runner.os }}-v1
 
       - name: Use cached vcpkg dependencies
         id: cache-dependencies
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/vcpkg_installed
-          key: wasm-sdl2-dependencies-${{ hashFiles('.github/workflows/wasm.yml', 'vcpkg.json') }}
+          key: wasm-dependencies-${{ hashFiles('vcpkg.json') }}
 
       - name: Configure build
         env:
@@ -66,6 +66,8 @@ jobs:
           mkdir -p build
           cd build
 
+          VCPKG_LIB_DIR="${{ github.workspace }}/vcpkg_installed/wasm32-emscripten/lib"
+
           if [ "$BUILD_TYPE" = "Release" ]; then
             OPT_FLAGS="-O3 -flto"
             LINK_OPT_FLAGS="-O3 -flto -sLZ4=1 -sASSERTIONS=0"
@@ -74,24 +76,21 @@ jobs:
             LINK_OPT_FLAGS="-O0 -g -sASSERTIONS=2 -sSAFE_HEAP=1"
           fi
 
-          SDL2_PORTS="-sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]'"
+          # Explicitly link vcpkg's libSDL3_image.a (and image codecs) so IMG_Load_IO is never dropped
+          SDL3_IMG_LINK="-L${VCPKG_LIB_DIR} -lSDL3_image -lpng16 -ljpeg -lspng -lz"
           MEM_FLAGS="-sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -lidbfs.js"
 
           emcmake cmake .. \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DWARNINGS=ON \
-            -DENABLE_SDL3=OFF \
-            -DCMAKE_DISABLE_FIND_PACKAGE_SDL3=TRUE \
-            -DCMAKE_DISABLE_FIND_PACKAGE_SDL3_image=TRUE \
-            -DCMAKE_DISABLE_FIND_PACKAGE_SDL3_ttf=TRUE \
             -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=~/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake \
             -DVCPKG_TARGET_TRIPLET=wasm32-emscripten \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DVCPKG_MANIFEST_FEATURES=core \
-            -DCMAKE_C_FLAGS_INIT="${OPT_FLAGS} ${SDL2_PORTS}" \
-            -DCMAKE_CXX_FLAGS_INIT="-include exception ${OPT_FLAGS} ${SDL2_PORTS}" \
-            -DCMAKE_EXE_LINKER_FLAGS_INIT="${LINK_OPT_FLAGS} ${SDL2_PORTS} ${MEM_FLAGS}"
+            -DCMAKE_C_FLAGS_INIT="${OPT_FLAGS}" \
+            -DCMAKE_CXX_FLAGS_INIT="-include exception ${OPT_FLAGS}" \
+            -DCMAKE_EXE_LINKER_FLAGS_INIT="${LINK_OPT_FLAGS} ${SDL3_IMG_LINK} ${MEM_FLAGS}"
 
       - name: Sync data folder
         working-directory: build
