@@ -76,9 +76,11 @@ jobs:
             LINK_OPT_FLAGS="-O0 -g -sASSERTIONS=2 -sSAFE_HEAP=1"
           fi
 
-          # Explicitly link vcpkg's libSDL3_image.a (and image codecs) so IMG_Load_IO is never dropped
-          SDL3_IMG_LINK="-L${VCPKG_LIB_DIR} -lSDL3_image -lpng16 -ljpeg -lspng -lz"
           MEM_FLAGS="-sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -lidbfs.js"
+
+          # CMake appends CMAKE_CXX_STANDARD_LIBRARIES at the VERY END of the linker line (after all .o files),
+          # ensuring wasm-ld resolves IMG_Load_IO and its image codec dependencies from vcpkg.
+          SDL3_IMG_LIBS="-Wl,--whole-archive ${VCPKG_LIB_DIR}/libSDL3_image.a -Wl,--no-whole-archive ${VCPKG_LIB_DIR}/libpng16.a ${VCPKG_LIB_DIR}/libjpeg.a ${VCPKG_LIB_DIR}/libspng.a ${VCPKG_LIB_DIR}/libz.a"
 
           emcmake cmake .. \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
@@ -90,7 +92,8 @@ jobs:
             -DVCPKG_MANIFEST_FEATURES=core \
             -DCMAKE_C_FLAGS_INIT="${OPT_FLAGS}" \
             -DCMAKE_CXX_FLAGS_INIT="-include exception ${OPT_FLAGS}" \
-            -DCMAKE_EXE_LINKER_FLAGS_INIT="${LINK_OPT_FLAGS} ${SDL3_IMG_LINK} ${MEM_FLAGS}"
+            -DCMAKE_EXE_LINKER_FLAGS_INIT="${LINK_OPT_FLAGS} ${MEM_FLAGS}" \
+            -DCMAKE_CXX_STANDARD_LIBRARIES="${SDL3_IMG_LIBS}"
 
       - name: Sync data folder
         working-directory: build
@@ -102,6 +105,8 @@ jobs:
         run: |
           source ~/emsdk/emsdk_env.sh
           emmake make -j$(nproc)
+          # Fail immediately if IMG_Load_IO is still an unresolved stub in supertux2.js
+          ! grep -q "missing function: IMG_Load_IO" supertux2.js
 
       - name: Setup files for upload
         working-directory: build
