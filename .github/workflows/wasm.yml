@@ -90,8 +90,7 @@ jobs:
 
           MEM_FLAGS="-sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -lidbfs.js"
 
-          # Explicit archive paths so cold-cache CMake configure never embeds a literal "*.a"
-          SDL3_IMG_LIBS="-Wl,--whole-archive ${VCPKG_LIB_DIR}/libSDL3_image.a -Wl,--no-whole-archive ${VCPKG_LIB_DIR}/libpng16.a ${VCPKG_LIB_DIR}/libjpeg.a ${VCPKG_LIB_DIR}/libspng.a ${VCPKG_LIB_DIR}/libz.a"
+          SDL3_IMG_LIBS="-Wl,--whole-archive ${VCPKG_LIB_DIR}/libSDL3_image.a -Wl,--no-whole-archive -L${VCPKG_LIB_DIR} -lpng16 -ljpeg -lspng_static -lz"
 
           emcmake cmake .. \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
