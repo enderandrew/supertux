@@ -78,8 +78,8 @@ jobs:
 
           MEM_FLAGS="-sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -lidbfs.js"
 
-          # Collect all vcpkg static libs dynamically from build/vcpkg_installed/wasm32-emscripten/lib
-          SDL3_IMG_LIBS="-Wl,--whole-archive ${VCPKG_LIB_DIR}/libSDL3_image.a -Wl,--no-whole-archive ${VCPKG_LIB_DIR}/*.a"
+          # Explicit archive paths so cold-cache CMake configure never embeds a literal "*.a"
+          SDL3_IMG_LIBS="-Wl,--whole-archive ${VCPKG_LIB_DIR}/libSDL3_image.a -Wl,--no-whole-archive ${VCPKG_LIB_DIR}/libpng16.a ${VCPKG_LIB_DIR}/libjpeg.a ${VCPKG_LIB_DIR}/libspng.a ${VCPKG_LIB_DIR}/libz.a"
 
           emcmake cmake .. \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
