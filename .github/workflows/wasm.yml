@@ -50,12 +50,26 @@ jobs:
           path: ~/emsdk/upstream/emscripten/cache
           key: emscripten-cache-${{ runner.os }}-v1
 
-      - name: Use cached vcpkg dependencies
+      - name: Cache vcpkg archives and installed packages
         id: cache-dependencies
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/build/vcpkg_installed
-          key: wasm-dependencies-${{ hashFiles('vcpkg.json') }}
+          path: |
+            /home/runner/.cache/vcpkg
+            ${{ github.workspace }}/build/vcpkg_installed
+          key: wasm-dependencies-${{ hashFiles('vcpkg.json') }}-v2
+
+      - name: Pre-fetch rate-limited vcpkg patches
+        run: |
+          sudo mkdir -p /usr/local/share/vcpkg/downloads
+          # Use GitHub REST API patch media type to avoid web frontend 503 rate limits on .patch URLs
+          if [ ! -f /usr/local/share/vcpkg/downloads/fmt-backport-4813.patch ]; then
+            sudo curl -fL --retry 5 --retry-delay 5 \
+              -H "Accept: application/vnd.github.v3.patch" \
+              -H "User-Agent: vcpkg-ci" \
+              "https://api.github.com/repos/fmtlib/fmt/commits/588b3a0f8f6a8bcf2a959cae882d5b2703e86737" \
+              -o /usr/local/share/vcpkg/downloads/fmt-backport-4813.patch
+          fi
 
       - name: Configure build
         env:
